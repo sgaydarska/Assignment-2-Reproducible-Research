@@ -39,8 +39,8 @@ ggplot(health_damage, aes(y=TTL_DMG, x=reorder(EVTYPE, -TTL_DMG), fill = DMG_TYP
   xlab("Event Type") +
   ylab("Total Health Damage") +
   ggtitle("Top 5 events in the USA causing the highest number of fatalities and injuries") +
-  scale_fill_brewer(palette = "Set1")
-
+  scale_fill_brewer(palette = "Set1") +
+  scale_fill_discrete(name="Damage Type", labels=c("Total Fatalities","Total Injuries"))
 
 
 
@@ -80,9 +80,12 @@ economic_damage = economic_damage %>%
 
 
 # Plotting crop damage by event type
-ggplot(economic_damage, aes(y=TTL_DMG, x=reorder(EVTYPE, -TTL_DMG), fill=DMG_TYPE) +
+ggplot(economic_damage, aes(y=DMG_VALUE, x=reorder(EVTYPE, +DMG_VALUE), fill=DMG_TYPE)) +
          geom_bar(stat = "identity") +
          xlab("Event Type") +
          ylab("Total Economic Damage") +
          ggtitle("Top 5 events in the USA causing the highest economic damage") +
-         scale_fill_brewer(palette = "Set3"))
+         scale_fill_brewer(palette = "Set3") +
+         coord_flip() +
+         scale_fill_discrete(name="Damage Type", labels=c("Total Crop Damage","Total Property Damage"))
+
