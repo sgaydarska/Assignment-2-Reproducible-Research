@@ -86,11 +86,3 @@ ggplot(economic_damage, aes(y=TTL_DMG, x=reorder(EVTYPE, -TTL_DMG), fill=DMG_TYP
          ylab("Total Economic Damage") +
          ggtitle("Top 5 events in the USA causing the highest economic damage") +
          scale_fill_brewer(palette = "Set3"))
-
-rm("economic_damage")
-
-head(economic_damage, 10)
-head(health_damage,10)
-summary(economic_damage)
-
-
