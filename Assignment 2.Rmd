@@ -1,0 +1,164 @@
+---
+title: "Assignment 2 Reproducible Research"
+author: "Sani"
+date: "5 January 2019"
+output: html_document
+---
+
+# *Which severe weather events cause the most damage to population health and have the greatest economic consequences in the US*
+
+#### The goal of this assignment is to explore the NOAA Storm Database and assess the types of severe weather events that cause the most harm to Americans represented by fatalities and injuries and also have high impact on certain economic areas such as property and crops. 
+
+
+# *Synopsis*
+
+#### Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern.
+
+#### This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+
+#### **The aim of this project ius to answer the following two questions:**
+#### 1. Across the United States, which types of events (as indicated in the \color{red}{\verb|EVTYPE|}EVTYPE variable) are most harmful with respect to population health?
+#### 2. Across the United States, which types of events have the greatest economic consequences?
+
+#### **The results of the analysis show that:**
+#### 1. Tornados followed by excessive heat  cause the highest number of fatalities and injuries, hence are the most harmful to the population health.
+#### 2. Floods followed by hurricane/typhoones have the highest economical consequences. 
+
+
+# *Data Processing*
+
+#### 1. Loading necessary packages
+
+```{r, echo=T}
+library(plyr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(RColorBrewer)
+```
+
+#### 2. Downloading data and loading into work environment
+
+```{r, echo=T, cache=T}
+URL <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+download.file(URL, destfile = "storm_data.csv", method = "curl")
+storm_data <- read.csv(file = "storm_data.csv", sep = ",", header = T, stringsAsFactors = F)
+```
+
+#### 3. Downloading and storing data documentation
+
+```{r, echo=T, cache=T}
+URL2 <- "https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf"
+download.file(URL2, destfile = "storm_data_documentation.pdf", method = "curl")
+```
+
+#### 4. Selecting only the variables needed to address the critical questions
+
+```{r, echo=T}
+clean_storm = storm_data %>%
+  select(STATE, EVTYPE, FATALITIES, INJURIES, PROPDMG, PROPDMGEXP, CROPDMG, CROPDMGEXP) 
+```
+
+#### We have selected the following:
+* State: state abbervation in US
+* Event: event type
+* Fatalities: number of people died
+* Injuries: number of people injured
+* Property.Damage: property damage in USD
+* Property.Damage.Exp: property damage unit (B,M,K,H)
+* Crop.Damage: crop damage in USD
+* Crop.Damage.Exp: crop damage unit (B,M,K,H)
+
+#### 5. To answer the health damage question we selected only health related variables (fatalities and Injuries) together with the event type
+```{r, echo=T}
+health_damage = clean_storm %>%
+  select(EVTYPE, FATALITIES, INJURIES) %>%
+  mutate(TOTAL = FATALITIES + INJURIES) %>%
+  group_by(EVTYPE) %>%
+  summarize(FATALITIES=sum(FATALITIES), INJURIES=sum(INJURIES), TOTAL=sum(TOTAL)) %>%
+  arrange(desc(TOTAL))
+```
+
+#### Selecting the top 5 severe weather events and splitting the results by damage type
+
+```{r, echo=T}
+health_damage = health_damage[1:5,]
+health_damage = health_damage %>%
+  gather(DMG_TYPE, TTL_DMG, FATALITIES:INJURIES)
+```
+
+#### 6. To answer the economic damage question we select only the economic related variables (PROPDMG and CROPDMG) as well as the variables that signify their magnitutde (PROPDMGEXP AND CROPDMGEXP)
+
+```{r, echo=T}
+unique(clean_storm$PROPDMGEXP)
+unique(clean_storm$CROPDMGEXP)
+```
+
+#### We convert the magnitude variables to the corresponding numeric values
+
+```{r, echo=T}
+economic_damage = clean_storm %>%
+  select(EVTYPE, PROPDMG, PROPDMGEXP, CROPDMG, CROPDMGEXP)
+economic_damage$PROPDMGEXP_CONV = as.numeric(mapvalues(economic_damage$PROPDMGEXP,
+                                            c("K","M","", "B","m","+","0","5","6","?","4","2","3","h","7","H","-","1","8"), 
+                                            c(1e3,1e6, 1, 1e9,1e6,1,1,1e5,1e6,1,1e4,1e2,1e3,1,1e7,1e2,1,10,1e8)))
+economic_damage$CROPDMGEXP_CONV = as.numeric(mapvalues(economic_damage$CROPDMGEXP,
+                                            c("","M","K","m","B","?","0","k","2"),
+                                            c( 1,1e6,1e3,1e6,1e9,1,1,1e3,1e2)))
+```
+
+#### We combine the damage variables grouped by the event type
+
+```{r, echo=T}
+economic_damage = economic_damage %>%
+  group_by(EVTYPE) %>%
+  mutate(TTL_PROPDMG=PROPDMG*PROPDMGEXP_CONV, TTL_CROPDMG=CROPDMG*CROPDMGEXP_CONV) %>%
+  mutate(TTL_DMG=TTL_PROPDMG + TTL_CROPDMG) %>%
+  summarize(TTL_PROPDMG=sum(TTL_PROPDMG), TTL_CROPDMG=sum(TTL_CROPDMG),
+            TTL_DMG=sum(TTL_DMG)) %>%
+  arrange(desc(TTL_DMG))
+```
+
+#### Selecting the top 5 severe weather events and splitting the results by damage type
+
+```{r, echo=T}
+economic_damage <- economic_damage[1:5,]
+economic_damage = economic_damage %>%
+  gather(DMG_TYPE, DMG_VALUE, TTL_PROPDMG:TTL_CROPDMG)
+```
+
+
+# *Results*
+
+### 1. Across the United States, which types of events (as indicated in the \color{red}{\verb|EVTYPE|}EVTYPE variable) are most harmful with respect to population health?
+
+#### Plotting the 5 event types that cause the highest population health damage
+
+```{r, echo=T}
+ggplot(health_damage, aes(y=TTL_DMG, x=reorder(EVTYPE, -TTL_DMG), fill = DMG_TYPE)) +
+  geom_bar(stat="identity") +
+  xlab("Event Type") +
+  ylab("Total Health Damage") +
+  ggtitle("Top 5 events in the USA causing the highest number of fatalities and injuries") +
+  scale_fill_brewer(palette = "Set1") +
+  scale_fill_discrete(name="Damage Type", labels=c("Total Fatalities","Total Injuries"))
+```
+
+#### From the graph we can conclude that tornados followe by excessive heat cause the highest damage to people's health in the United States
+
+#### 2. Across the United States, which types of events have the greatest economic consequences?
+
+#### Plotting the 5 event types that cause the highest economic damage
+
+```{r, echo=T}
+ggplot(economic_damage, aes(y=DMG_VALUE, x=reorder(EVTYPE, +DMG_VALUE), fill=DMG_TYPE)) +
+         geom_bar(stat = "identity") +
+         xlab("Event Type") +
+         ylab("Total Economic Damage") +
+         ggtitle("Top 5 events in the USA causing the highest economic damage") +
+         scale_fill_brewer(palette = "Set3") +
+         coord_flip() +
+         scale_fill_discrete(name="Damage Type", labels=c("Total Crop Damage","Total Property Damage"))
+```
+
+#### From the graph we can conclude that on a combined level floods followed by hurricane/typhoones have the highest economical consequences. 
